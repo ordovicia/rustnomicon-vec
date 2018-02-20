@@ -23,12 +23,10 @@ impl<T> Vec<T> {
     }
 
     fn grow(&mut self) {
-        let (new_cap, ptr) = if self.cap == 0 {
-            (1, self.alloc.alloc_one::<T>())
+        let (ptr, new_cap) = if self.cap == 0 {
+            (self.alloc.alloc_one::<T>(), 1)
         } else {
             let elem_size = mem::size_of::<T>();
-
-            let new_cap = self.cap * 2;
             let old_num_bytes = self.cap * elem_size;
 
             assert!(
@@ -37,9 +35,10 @@ impl<T> Vec<T> {
             );
 
             unsafe {
+                let new_cap = self.cap * 2;
                 let ptr = self.alloc
-                    .realloc_array::<T>(self.ptr.as_ptr(), self.cap, new_cap);
-                (new_cap, ptr)
+                    .realloc_array::<T>(self.ptr.as_non_null(), self.cap, new_cap);
+                (ptr, new_cap)
             }
         };
 

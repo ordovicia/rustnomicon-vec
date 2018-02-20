@@ -17,13 +17,6 @@ impl<T> OwnedPtr<T> {
         }
     }
 
-    // pub(crate) unsafe fn new(ptr: *mut T) -> Self {
-    //     OwnedPtr {
-    //         ptr: NonNull::new_unchecked(ptr),
-    //         _marker: PhantomData,
-    //     }
-    // }
-
     pub(crate) fn with_non_null(ptr: NonNull<T>) -> Self {
         OwnedPtr {
             ptr,
@@ -31,7 +24,7 @@ impl<T> OwnedPtr<T> {
         }
     }
 
-    pub(crate) fn as_ptr(&self) -> NonNull<T> {
+    pub(crate) fn as_non_null(&self) -> NonNull<T> {
         self.ptr
     }
 }
