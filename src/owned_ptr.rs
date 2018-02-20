@@ -27,4 +27,8 @@ impl<T> OwnedPtr<T> {
     pub(crate) fn as_non_null(&self) -> NonNull<T> {
         self.ptr
     }
+
+    pub(crate) fn as_ptr(&mut self) -> *mut T {
+        self.ptr.as_ptr()
+    }
 }

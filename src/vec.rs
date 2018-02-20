@@ -1,3 +1,4 @@
+use std::ptr;
 use std::mem;
 use std::heap::{Alloc, Heap};
 
@@ -19,6 +20,51 @@ impl<T> Vec<T> {
             cap: 0,
             len: 0,
             alloc: Heap,
+        }
+    }
+
+    /// Stores an element to the last position.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// extern crate nomicon_vec;
+    ///
+    /// let mut v = nomicon_vec::vec::Vec::new();
+    /// v.push(0);
+    /// ```
+    pub fn push(&mut self, elem: T) {
+        if self.len == self.cap {
+            self.grow();
+        }
+
+        unsafe {
+            ptr::write(self.ptr.as_ptr(), elem);
+        }
+
+        self.len += 1;
+    }
+
+    /// Removes and returns an element from the last position.
+    /// Returns `None` if no elements are stored.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// extern crate nomicon_vec;
+    ///
+    /// let mut v = nomicon_vec::vec::Vec::new();
+    /// assert!(v.pop().is_none());
+    ///
+    /// v.push(0);
+    /// assert_eq!(v.pop().unwrap(), 0);
+    /// ```
+    pub fn pop(&mut self) -> Option<T> {
+        if self.len == 0 {
+            None
+        } else {
+            self.len -= 1;
+            unsafe { Some(ptr::read(self.ptr.as_ptr())) }
         }
     }
 
