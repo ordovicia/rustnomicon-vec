@@ -24,7 +24,7 @@ mod tests {
 
         for (i, e) in elems.rev().enumerate() {
             let p = v.pop();
-            assert!(p.is_some() && p.unwrap() == e);
+            assert_eq!(p, Some(e));
             assert_eq!(v.len(), ELEM_NUM - 1 - i);
         }
 
@@ -38,7 +38,7 @@ mod tests {
 
         v.push(0);
         assert_eq!(v.len(), 1);
-        assert_eq!(v.first().unwrap(), &0);
+        assert_eq!(v.first(), Some(&0));
     }
 
     #[test]
@@ -49,7 +49,7 @@ mod tests {
         v.push(1);
         v.reverse();
 
-        assert_eq!(v.pop().unwrap(), 0);
-        assert_eq!(v.pop().unwrap(), 1);
+        assert_eq!(v.pop(), Some(0));
+        assert_eq!(v.pop(), Some(1));
     }
 }

@@ -16,17 +16,13 @@ impl<T> Deref for Vec<T> {
     type Target = [T];
 
     fn deref(&self) -> &[T] {
-        unsafe {
-            ::std::slice::from_raw_parts(self.ptr.as_ptr(), self.len)
-        }
+        unsafe { ::std::slice::from_raw_parts(self.ptr.as_ptr(), self.len) }
     }
 }
 
 impl<T> DerefMut for Vec<T> {
     fn deref_mut(&mut self) -> &mut [T] {
-        unsafe {
-            ::std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len)
-        }
+        unsafe { ::std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len) }
     }
 }
 
@@ -108,12 +104,12 @@ impl<T> Vec<T> {
     /// assert!(v.pop().is_none());
     ///
     /// v.push(0);
-    /// assert_eq!(v.pop().unwrap(), 0);
+    /// assert_eq!(v.pop(), Some(0));
     ///
     /// v.push(0);
     /// v.push(1);
-    /// assert_eq!(v.pop().unwrap(), 1);
-    /// assert_eq!(v.pop().unwrap(), 0);
+    /// assert_eq!(v.pop(), Some(1));
+    /// assert_eq!(v.pop(), Some(0));
     /// assert_eq!(v.len(), 0);
     ///
     /// assert!(v.pop().is_none());
@@ -127,6 +123,79 @@ impl<T> Vec<T> {
                 let ptr_last = self.ptr.as_ptr().offset(self.len as isize);
                 Some(ptr::read(ptr_last))
             }
+        }
+    }
+
+    /// Inserts an element to a target index.
+    /// Elements at the target index are shifted to right by one.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// extern crate nomicon_vec;
+    ///
+    /// let mut v = nomicon_vec::vec::Vec::new();
+    /// v.push(0);
+    /// v.push(1);
+    /// v.insert(1, 2);
+    ///
+    /// assert_eq!(v.len(), 3);
+    /// assert_eq!(v.get(0), Some(&0));
+    /// assert_eq!(v.get(1), Some(&2));
+    /// assert_eq!(v.get(2), Some(&1));
+    /// ```
+    pub fn insert(&mut self, index: usize, elem: T) {
+        assert!(index <= self.len, "index out of bounds");
+
+        if self.len == self.cap {
+            self.grow();
+        }
+
+        unsafe {
+            if index < self.len {
+                ptr::copy(
+                    self.ptr.as_ptr().offset(index as isize),
+                    self.ptr.as_ptr().offset(index as isize + 1),
+                    self.len - index,
+                );
+            }
+
+            ptr::write(self.ptr.as_ptr().offset(index as isize), elem);
+        }
+
+        self.len += 1;
+    }
+
+    /// Removes an element at a target index.
+    /// Elements at the target index are shifted to left by one.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// extern crate nomicon_vec;
+    ///
+    /// let mut v = nomicon_vec::vec::Vec::new();
+    /// v.push(0);
+    /// v.push(1);
+    /// v.push(2);
+    ///
+    /// assert_eq!(v.remove(1), 1);
+    /// assert_eq!(v.len(), 2);
+    /// assert_eq!(v.get(0), Some(&0));
+    /// assert_eq!(v.get(1), Some(&2));
+    /// ```
+    pub fn remove(&mut self, index: usize) -> T {
+        assert!(index < self.len, "index out of bounds");
+
+        self.len -= 1;
+        unsafe {
+            let result = ptr::read(self.ptr.as_ptr().offset(index as isize));
+            ptr::copy(
+                self.ptr.as_ptr().offset(index as isize + 1),
+                self.ptr.as_ptr().offset(index as isize),
+                self.len - index,
+            );
+            result
         }
     }
 
