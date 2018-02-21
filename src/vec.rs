@@ -1,4 +1,5 @@
 use std::ptr;
+use std::ops::{Deref, DerefMut};
 use std::mem;
 use std::heap::{Alloc, Heap};
 
@@ -9,6 +10,24 @@ pub struct Vec<T> {
     cap: usize,
     len: usize,
     alloc: Heap,
+}
+
+impl<T> Deref for Vec<T> {
+    type Target = [T];
+
+    fn deref(&self) -> &[T] {
+        unsafe {
+            ::std::slice::from_raw_parts(self.ptr.as_ptr(), self.len)
+        }
+    }
+}
+
+impl<T> DerefMut for Vec<T> {
+    fn deref_mut(&mut self) -> &mut [T] {
+        unsafe {
+            ::std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len)
+        }
+    }
 }
 
 impl<T> Drop for Vec<T> {
@@ -47,10 +66,6 @@ impl<T> Vec<T> {
             len: 0,
             alloc: Heap,
         }
-    }
-
-    pub fn len(&self) -> usize {
-        self.len
     }
 
     /// Stores an element to the last position.
@@ -158,26 +173,6 @@ mod tests {
             v.grow();
             assert_eq!(v.cap, cap);
         }
-    }
-
-    #[test]
-    fn push_pop() {
-        let mut v = Vec::new();
-        const ELEM_NUM: usize = 32;
-        let elems = 0..ELEM_NUM;
-
-        for (i, e) in elems.clone().enumerate() {
-            v.push(e);
-            assert_eq!(v.len(), i + 1);
-        }
-
-        for (i, e) in elems.rev().enumerate() {
-            let p = v.pop();
-            assert!(p.is_some() && p.unwrap() == e);
-            assert_eq!(v.len(), ELEM_NUM - 1 - i);
-        }
-
-        assert!(v.pop().is_none());
     }
 
     #[test]

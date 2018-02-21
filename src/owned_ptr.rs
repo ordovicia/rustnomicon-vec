@@ -28,7 +28,7 @@ impl<T> OwnedPtr<T> {
         self.ptr
     }
 
-    pub(crate) fn as_ptr(&mut self) -> *mut T {
+    pub(crate) fn as_ptr(&self) -> *mut T {
         self.ptr.as_ptr()
     }
 }
