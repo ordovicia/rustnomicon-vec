@@ -23,6 +23,10 @@ impl<T> Vec<T> {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
     /// Stores an element to the last position.
     ///
     /// # Example
@@ -31,7 +35,12 @@ impl<T> Vec<T> {
     /// extern crate nomicon_vec;
     ///
     /// let mut v = nomicon_vec::vec::Vec::new();
+    ///
     /// v.push(0);
+    /// assert_eq!(v.len(), 1);
+    ///
+    /// v.push(1);
+    /// assert_eq!(v.len(), 2);
     /// ```
     pub fn push(&mut self, elem: T) {
         if self.len == self.cap {
@@ -39,7 +48,8 @@ impl<T> Vec<T> {
         }
 
         unsafe {
-            ptr::write(self.ptr.as_ptr(), elem);
+            let ptr_last = self.ptr.as_ptr().offset(self.len as isize);
+            ptr::write(ptr_last, elem);
         }
 
         self.len += 1;
@@ -58,13 +68,24 @@ impl<T> Vec<T> {
     ///
     /// v.push(0);
     /// assert_eq!(v.pop().unwrap(), 0);
+    ///
+    /// v.push(0);
+    /// v.push(1);
+    /// assert_eq!(v.pop().unwrap(), 1);
+    /// assert_eq!(v.pop().unwrap(), 0);
+    /// assert_eq!(v.len(), 0);
+    ///
+    /// assert!(v.pop().is_none());
     /// ```
     pub fn pop(&mut self) -> Option<T> {
         if self.len == 0 {
             None
         } else {
             self.len -= 1;
-            unsafe { Some(ptr::read(self.ptr.as_ptr())) }
+            unsafe {
+                let ptr_last = self.ptr.as_ptr().offset(self.len as isize);
+                Some(ptr::read(ptr_last))
+            }
         }
     }
 
@@ -110,6 +131,26 @@ mod tests {
             v.grow();
             assert_eq!(v.cap, cap);
         }
+    }
+
+    #[test]
+    fn push_pop() {
+        let mut v = Vec::new();
+        const ELEM_NUM: usize = 32;
+        let elems = 0..ELEM_NUM;
+
+        for (i, e) in elems.clone().enumerate() {
+            v.push(e);
+            assert_eq!(v.len(), i + 1);
+        }
+
+        for (i, e) in elems.rev().enumerate() {
+            let p = v.pop();
+            assert!(p.is_some() && p.unwrap() == e);
+            assert_eq!(v.len(), ELEM_NUM - 1 - i);
+        }
+
+        assert!(v.pop().is_none());
     }
 
     #[test]
