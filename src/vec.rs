@@ -11,6 +11,32 @@ pub struct Vec<T> {
     alloc: Heap,
 }
 
+impl<T> Drop for Vec<T> {
+    fn drop(&mut self) {
+        match self.cap {
+            0 => {}
+            1 => {
+                if mem::needs_drop::<T>() {
+                    self.pop();
+                }
+                unsafe {
+                    self.alloc.dealloc_one(self.ptr.as_non_null());
+                }
+            }
+            n => {
+                if mem::needs_drop::<T>() {
+                    while let Some(_) = self.pop() {}
+                }
+                unsafe {
+                    if let Err(e) = self.alloc.dealloc_array(self.ptr.as_non_null(), n) {
+                        self.alloc.oom(e);
+                    }
+                }
+            }
+        }
+    }
+}
+
 impl<T> Vec<T> {
     pub fn new() -> Self {
         assert!(mem::size_of::<T>() != 0, "We're not ready to handle ZSTs");
@@ -121,6 +147,7 @@ impl<T> Vec<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test;
 
     #[test]
     fn grow() {
@@ -157,5 +184,32 @@ mod tests {
     #[should_panic]
     fn zst_panic() {
         let _: Vec<()> = Vec::new();
+    }
+
+    #[bench]
+    fn dealloc_i32(b: &mut test::Bencher) {
+        b.iter(|| {
+            let mut v: Vec<i32> = test::black_box(Vec::new());
+            for i in 0..(1 << 16) {
+                v.push(i);
+            }
+        });
+    }
+
+    #[derive(Clone)]
+    struct Array {
+        x: [i32; 32],
+    }
+
+    #[bench]
+    fn dealloc_array(b: &mut test::Bencher) {
+        let n = Array { x: [0; 32] };
+
+        b.iter(|| {
+            let mut v = test::black_box(Vec::new());
+            for _ in 0..(1 << 16) {
+                v.push(n.clone());
+            }
+        });
     }
 }
