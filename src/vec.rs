@@ -4,6 +4,7 @@ use std::mem;
 use std::heap::{Alloc, Heap};
 
 use owned_ptr::OwnedPtr;
+use into_iter::IntoIter;
 
 pub struct Vec<T> {
     ptr: OwnedPtr<T>,
@@ -28,24 +29,20 @@ impl<T> DerefMut for Vec<T> {
 
 impl<T> Drop for Vec<T> {
     fn drop(&mut self) {
-        match self.cap {
-            0 => {}
-            1 => {
-                if mem::needs_drop::<T>() {
-                    self.pop();
-                }
-                unsafe {
-                    self.alloc.dealloc_one(self.ptr.as_non_null());
-                }
-            }
-            n => {
-                if mem::needs_drop::<T>() {
-                    while let Some(_) = self.pop() {}
-                }
-                unsafe {
-                    if let Err(e) = self.alloc.dealloc_array(self.ptr.as_non_null(), n) {
-                        self.alloc.oom(e);
-                    }
+        if self.cap == 0 {
+            return;
+        }
+
+        if mem::needs_drop::<T>() {
+            while let Some(_) = self.pop() {}
+        }
+
+        unsafe {
+            if self.cap == 1 {
+                self.alloc.dealloc_one(self.ptr.as_non_null());
+            } else {
+                if let Err(e) = self.alloc.dealloc_array(self.ptr.as_non_null(), self.cap) {
+                    self.alloc.oom(e);
                 }
             }
         }
@@ -153,6 +150,7 @@ impl<T> Vec<T> {
 
         unsafe {
             if index < self.len {
+                // ptr::copy(src, dest, len): "copy from source to dest len elems"
                 ptr::copy(
                     self.ptr.as_ptr().offset(index as isize),
                     self.ptr.as_ptr().offset(index as isize + 1),
@@ -188,6 +186,7 @@ impl<T> Vec<T> {
         assert!(index < self.len, "index out of bounds");
 
         self.len -= 1;
+
         unsafe {
             let result = ptr::read(self.ptr.as_ptr().offset(index as isize));
             ptr::copy(
@@ -196,6 +195,36 @@ impl<T> Vec<T> {
                 self.len - index,
             );
             result
+        }
+    }
+
+    /// Creates an [`IntoIter`] instance from self.
+    ///
+    /// [`IntoIter`]: ../into_iter/struct.IntoIter.html
+    pub fn into_iter(self) -> IntoIter<T> {
+        let Vec {
+            ptr: buf,
+            cap,
+            len,
+            alloc,
+        } = self;
+
+        // Make sure not to drop Vec since that will free the buffer
+        mem::forget(self);
+
+        unsafe {
+            IntoIter {
+                buf,
+                cap,
+                start: buf.as_ptr(),
+                end: if cap == 0 {
+                    // can't offset off this pointer, it's not allocated!
+                    buf.as_ptr()
+                } else {
+                    buf.as_ptr().offset(len as isize)
+                },
+                alloc,
+            }
         }
     }
 
@@ -231,7 +260,12 @@ impl<T> Vec<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test;
+
+    #[test]
+    #[should_panic]
+    fn zst_panic() {
+        let _: Vec<()> = Vec::new();
+    }
 
     #[test]
     fn grow() {
@@ -245,35 +279,45 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn zst_panic() {
-        let _: Vec<()> = Vec::new();
+    fn push_pop() {
+        let mut v = Vec::new();
+
+        const ELEM_NUM: usize = 32;
+        let elems = 0..ELEM_NUM;
+
+        for (i, e) in elems.clone().enumerate() {
+            v.push(e);
+            assert_eq!(v.len(), i + 1);
+        }
+
+        for (i, e) in elems.rev().enumerate() {
+            let p = v.pop();
+            assert_eq!(p, Some(e));
+            assert_eq!(v.len(), ELEM_NUM - 1 - i);
+        }
+
+        assert!(v.pop().is_none());
     }
 
-    #[bench]
-    fn dealloc_i32(b: &mut test::Bencher) {
-        b.iter(|| {
-            let mut v: Vec<i32> = test::black_box(Vec::new());
-            for i in 0..(1 << 16) {
-                v.push(i);
-            }
-        });
+    #[test]
+    fn deref_slice() {
+        let mut v: Vec<i32> = Vec::new();
+        assert!(v.is_empty());
+
+        v.push(0);
+        assert_eq!(v.len(), 1);
+        assert_eq!(v.first(), Some(&0));
     }
 
-    #[derive(Clone)]
-    struct Array {
-        x: [i32; 32],
-    }
+    #[test]
+    fn deref_mut_slice() {
+        let mut v: Vec<i32> = Vec::new();
 
-    #[bench]
-    fn dealloc_array(b: &mut test::Bencher) {
-        let n = Array { x: [0; 32] };
+        v.push(0);
+        v.push(1);
+        v.reverse();
 
-        b.iter(|| {
-            let mut v = test::black_box(Vec::new());
-            for _ in 0..(1 << 16) {
-                v.push(n.clone());
-            }
-        });
+        assert_eq!(v.pop(), Some(0));
+        assert_eq!(v.pop(), Some(1));
     }
 }
