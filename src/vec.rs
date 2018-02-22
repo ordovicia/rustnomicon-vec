@@ -1,65 +1,51 @@
-use std::ptr;
-use std::ops::{Deref, DerefMut};
 use std::mem;
-use std::heap::{Alloc, Heap};
+use std::ops::{Deref, DerefMut};
+use std::ptr;
 
-use owned_ptr::OwnedPtr;
+use raw_vec::RawVec;
 use into_iter::IntoIter;
 
 pub struct Vec<T> {
-    ptr: OwnedPtr<T>,
-    cap: usize,
+    buf: RawVec<T>,
     len: usize,
-    alloc: Heap,
 }
 
 impl<T> Deref for Vec<T> {
     type Target = [T];
 
     fn deref(&self) -> &[T] {
-        unsafe { ::std::slice::from_raw_parts(self.ptr.as_ptr(), self.len) }
+        unsafe { ::std::slice::from_raw_parts(self.ptr(), self.len) }
     }
 }
 
 impl<T> DerefMut for Vec<T> {
     fn deref_mut(&mut self) -> &mut [T] {
-        unsafe { ::std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len) }
+        unsafe { ::std::slice::from_raw_parts_mut(self.ptr(), self.len) }
     }
 }
 
 impl<T> Drop for Vec<T> {
     fn drop(&mut self) {
-        if self.cap == 0 {
-            return;
-        }
-
         if mem::needs_drop::<T>() {
             while let Some(_) = self.pop() {}
         }
 
-        unsafe {
-            if self.cap == 1 {
-                self.alloc.dealloc_one(self.ptr.as_non_null());
-            } else {
-                let e = self.alloc.dealloc_array(self.ptr.as_non_null(), self.cap);
-                if let Err(e) = e {
-                    self.alloc.oom(e);
-                }
-            }
-        }
+        // deallocation is handled by RawVec
     }
 }
 
 impl<T> Vec<T> {
-    pub fn new() -> Self {
-        assert!(mem::size_of::<T>() != 0, "We're not ready to handle ZSTs");
-
+    /// Create a new `Vec` with no elements.
+    pub fn default() -> Self {
         Vec {
-            ptr: OwnedPtr::empty(),
-            cap: 0,
+            buf: RawVec::default(),
             len: 0,
-            alloc: Heap,
         }
+    }
+
+    /// Returns capacity.
+    pub fn capacity(&self) -> usize {
+        self.buf.cap
     }
 
     /// Stores an element to the last position.
@@ -69,7 +55,7 @@ impl<T> Vec<T> {
     /// ```rust
     /// extern crate nomicon_vec;
     ///
-    /// let mut v = nomicon_vec::vec::Vec::new();
+    /// let mut v = nomicon_vec::vec::Vec::default();
     ///
     /// v.push(0);
     /// assert_eq!(v.len(), 1);
@@ -78,12 +64,12 @@ impl<T> Vec<T> {
     /// assert_eq!(v.len(), 2);
     /// ```
     pub fn push(&mut self, elem: T) {
-        if self.len == self.cap {
-            self.grow();
+        if self.len == self.capacity() {
+            self.buf.grow();
         }
 
         unsafe {
-            let ptr_last = self.ptr.as_ptr().offset(self.len as isize);
+            let ptr_last = self.ptr().offset(self.len as isize);
             ptr::write(ptr_last, elem);
         }
 
@@ -98,7 +84,7 @@ impl<T> Vec<T> {
     /// ```rust
     /// extern crate nomicon_vec;
     ///
-    /// let mut v = nomicon_vec::vec::Vec::new();
+    /// let mut v = nomicon_vec::vec::Vec::default();
     /// assert!(v.pop().is_none());
     ///
     /// v.push(0);
@@ -118,7 +104,7 @@ impl<T> Vec<T> {
         } else {
             self.len -= 1;
             unsafe {
-                let ptr_last = self.ptr.as_ptr().offset(self.len as isize);
+                let ptr_last = self.ptr().offset(self.len as isize);
                 Some(ptr::read(ptr_last))
             }
         }
@@ -132,7 +118,7 @@ impl<T> Vec<T> {
     /// ```rust
     /// extern crate nomicon_vec;
     ///
-    /// let mut v = nomicon_vec::vec::Vec::new();
+    /// let mut v = nomicon_vec::vec::Vec::default();
     /// v.push(0);
     /// v.push(1);
     /// v.insert(1, 2);
@@ -145,21 +131,21 @@ impl<T> Vec<T> {
     pub fn insert(&mut self, index: usize, elem: T) {
         assert!(index <= self.len, "index out of bounds");
 
-        if self.len == self.cap {
-            self.grow();
+        if self.len == self.capacity() {
+            self.buf.grow();
         }
 
         unsafe {
             if index < self.len {
                 // ptr::copy(src, dest, len): "copy from source to dest len elems"
                 ptr::copy(
-                    self.ptr.as_ptr().offset(index as isize),
-                    self.ptr.as_ptr().offset(index as isize + 1),
+                    self.ptr().offset(index as isize),
+                    self.ptr().offset(index as isize + 1),
                     self.len - index,
                 );
             }
 
-            ptr::write(self.ptr.as_ptr().offset(index as isize), elem);
+            ptr::write(self.ptr().offset(index as isize), elem);
         }
 
         self.len += 1;
@@ -173,7 +159,7 @@ impl<T> Vec<T> {
     /// ```rust
     /// extern crate nomicon_vec;
     ///
-    /// let mut v = nomicon_vec::vec::Vec::new();
+    /// let mut v = nomicon_vec::vec::Vec::default();
     /// v.push(0);
     /// v.push(1);
     /// v.push(2);
@@ -189,10 +175,10 @@ impl<T> Vec<T> {
         self.len -= 1;
 
         unsafe {
-            let result = ptr::read(self.ptr.as_ptr().offset(index as isize));
+            let result = ptr::read(self.ptr().offset(index as isize));
             ptr::copy(
-                self.ptr.as_ptr().offset(index as isize + 1),
-                self.ptr.as_ptr().offset(index as isize),
+                self.ptr().offset(index as isize + 1),
+                self.ptr().offset(index as isize),
                 self.len - index,
             );
             result
@@ -203,56 +189,30 @@ impl<T> Vec<T> {
     ///
     /// [`IntoIter`]: ../into_iter/struct.IntoIter.html
     pub fn into_iter(self) -> IntoIter<T> {
-        let Vec {
-            ptr: buf,
-            cap,
-            len,
-            alloc,
-        } = self;
+        // need to use ptr::read to unsafely move the buf out since it's
+        // not Copy, and Vec implements Drop (so we can't destructure it).
+        let buf = unsafe { ptr::read(&self.buf) };
+        let cap = self.capacity();
+        let len = self.len;
 
-        // Make sure not to drop Vec since that will free the buffer
         mem::forget(self);
 
-        IntoIter {
+        let start = buf.ptr.as_ptr();
+
+        IntoIter::new(
             buf,
-            cap,
-            start: buf.as_ptr(),
-            end: if cap == 0 {
+            start,
+            if cap == 0 {
                 // can't offset off this pointer, it's not allocated!
-                buf.as_ptr()
+                start
             } else {
-                unsafe { buf.as_ptr().offset(len as isize) }
+                unsafe { start.offset(len as isize) }
             },
-            alloc,
-        }
+        )
     }
 
-    fn grow(&mut self) {
-        let (ptr, new_cap) = if self.cap == 0 {
-            (self.alloc.alloc_one::<T>(), 1)
-        } else {
-            let elem_size = mem::size_of::<T>();
-            let old_num_bytes = self.cap * elem_size;
-
-            assert!(
-                old_num_bytes <= (::std::isize::MAX as usize) / 2,
-                "capacity overflow"
-            );
-
-            unsafe {
-                let new_cap = self.cap * 2;
-                let ptr = self.alloc
-                    .realloc_array::<T>(self.ptr.as_non_null(), self.cap, new_cap);
-                (ptr, new_cap)
-            }
-        };
-
-        if let Err(e) = ptr {
-            self.alloc.oom(e);
-        }
-
-        self.ptr = OwnedPtr::with_non_null(ptr.unwrap());
-        self.cap = new_cap;
+    fn ptr(&self) -> *mut T {
+        self.buf.ptr.as_ptr()
     }
 }
 
@@ -261,25 +221,30 @@ mod tests {
     use super::*;
 
     #[test]
-    #[should_panic]
-    fn zst_panic() {
-        let _: Vec<()> = Vec::new();
+    fn deref_slice() {
+        let mut v: Vec<i32> = Vec::default();
+        assert!(v.is_empty());
+
+        v.push(0);
+        assert_eq!(v.len(), 1);
+        assert_eq!(v.first(), Some(&0));
     }
 
     #[test]
-    fn grow() {
-        let mut v: Vec<i32> = Vec::new();
-        assert_eq!(v.cap, 0);
+    fn deref_mut_slice() {
+        let mut v: Vec<i32> = Vec::default();
 
-        for cap in (0..16).map(|c| (2 as usize).pow(c)) {
-            v.grow();
-            assert_eq!(v.cap, cap);
-        }
+        v.push(0);
+        v.push(1);
+        v.reverse();
+
+        assert_eq!(v.pop(), Some(0));
+        assert_eq!(v.pop(), Some(1));
     }
 
     #[test]
     fn push_pop() {
-        let mut v = Vec::new();
+        let mut v = Vec::default();
 
         const ELEM_NUM: usize = 32;
         let elems = 0..ELEM_NUM;
@@ -296,27 +261,5 @@ mod tests {
         }
 
         assert!(v.pop().is_none());
-    }
-
-    #[test]
-    fn deref_slice() {
-        let mut v: Vec<i32> = Vec::new();
-        assert!(v.is_empty());
-
-        v.push(0);
-        assert_eq!(v.len(), 1);
-        assert_eq!(v.first(), Some(&0));
-    }
-
-    #[test]
-    fn deref_mut_slice() {
-        let mut v: Vec<i32> = Vec::new();
-
-        v.push(0);
-        v.push(1);
-        v.reverse();
-
-        assert_eq!(v.pop(), Some(0));
-        assert_eq!(v.pop(), Some(1));
     }
 }

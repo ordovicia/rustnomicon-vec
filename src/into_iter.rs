@@ -1,15 +1,12 @@
-use std::ptr;
 use std::mem;
-use std::heap::{Alloc, Heap};
+use std::ptr;
 
-use owned_ptr::OwnedPtr;
+use raw_vec::RawVec;
 
 pub struct IntoIter<T> {
-    pub(super) buf: OwnedPtr<T>,
-    pub(super) cap: usize,
-    pub(super) start: *const T,
-    pub(super) end: *const T,
-    pub(super) alloc: Heap,
+    _buf: RawVec<T>, // we don't actually care abount this. Just need it to live.
+    start: *const T,
+    end: *const T,
 }
 
 impl<T> Iterator for IntoIter<T> {
@@ -48,50 +45,85 @@ impl<T> DoubleEndedIterator for IntoIter<T> {
 
 impl<T> Drop for IntoIter<T> {
     fn drop(&mut self) {
-        if self.cap == 0 {
-            return;
-        }
-
         if mem::needs_drop::<T>() {
             for _ in &mut *self {}
         }
-        unsafe {
-            if self.cap == 1 {
-                self.alloc.dealloc_one(self.buf.as_non_null());
-            } else {
-                let e = self.alloc.dealloc_array(self.buf.as_non_null(), self.cap);
-                if let Err(e) = e {
-                    self.alloc.oom(e);
-                }
-            }
+
+        // deallocation is handled by RawVec
+    }
+}
+
+impl<T> IntoIter<T> {
+    pub(super) fn new(buf: RawVec<T>, start: *const T, end: *const T) -> Self {
+        IntoIter {
+            _buf: buf,
+            start,
+            end,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
     use vec::Vec;
 
     #[test]
-    fn iter_next() {
-        let mut v = Vec::new();
+    fn next() {
+        let mut v = Vec::default();
         v.push(0);
         v.push(1);
 
         let mut iter = v.into_iter();
         assert_eq!(iter.next(), Some(0));
         assert_eq!(iter.next(), Some(1));
+        assert_eq!(iter.next(), None);
     }
 
     #[test]
-    fn iter_next_back() {
-        let mut v = Vec::new();
+    fn size_hint() {
+        {
+            let v: Vec<i32> = Vec::default();
+            assert_eq!(v.into_iter().size_hint(), (0, Some(0)));
+        }
+
+        {
+            let mut v: Vec<i32> = Vec::default();
+            v.push(0);
+            assert_eq!(v.into_iter().size_hint(), (1, Some(1)));
+        }
+
+        {
+            let mut v: Vec<i32> = Vec::default();
+            v.push(0);
+            v.push(1);
+            assert_eq!(v.into_iter().size_hint(), (2, Some(2)));
+        }
+    }
+
+    #[test]
+    fn next_back() {
+        let mut v = Vec::default();
         v.push(0);
         v.push(1);
 
         let mut iter = v.into_iter();
         assert_eq!(iter.next_back(), Some(1));
         assert_eq!(iter.next_back(), Some(0));
+        assert_eq!(iter.next_back(), None);
+    }
+
+    #[test]
+    fn next_next_back() {
+        let mut v = Vec::default();
+        v.push(0);
+        v.push(1);
+        v.push(2);
+
+        let mut iter = v.into_iter();
+        assert_eq!(iter.next(), Some(0));
+        assert_eq!(iter.next_back(), Some(2));
+        assert_eq!(iter.next(), Some(1));
+        assert_eq!(iter.next_back(), None);
+        assert_eq!(iter.next(), None);
     }
 }
