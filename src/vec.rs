@@ -41,7 +41,8 @@ impl<T> Drop for Vec<T> {
             if self.cap == 1 {
                 self.alloc.dealloc_one(self.ptr.as_non_null());
             } else {
-                if let Err(e) = self.alloc.dealloc_array(self.ptr.as_non_null(), self.cap) {
+                let e = self.alloc.dealloc_array(self.ptr.as_non_null(), self.cap);
+                if let Err(e) = e {
                     self.alloc.oom(e);
                 }
             }
@@ -212,19 +213,17 @@ impl<T> Vec<T> {
         // Make sure not to drop Vec since that will free the buffer
         mem::forget(self);
 
-        unsafe {
-            IntoIter {
-                buf,
-                cap,
-                start: buf.as_ptr(),
-                end: if cap == 0 {
-                    // can't offset off this pointer, it's not allocated!
-                    buf.as_ptr()
-                } else {
-                    buf.as_ptr().offset(len as isize)
-                },
-                alloc,
-            }
+        IntoIter {
+            buf,
+            cap,
+            start: buf.as_ptr(),
+            end: if cap == 0 {
+                // can't offset off this pointer, it's not allocated!
+                buf.as_ptr()
+            } else {
+                unsafe { buf.as_ptr().offset(len as isize) }
+            },
+            alloc,
         }
     }
 

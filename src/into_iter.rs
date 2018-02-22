@@ -59,7 +59,8 @@ impl<T> Drop for IntoIter<T> {
             if self.cap == 1 {
                 self.alloc.dealloc_one(self.buf.as_non_null());
             } else {
-                if let Err(e) = self.alloc.dealloc_array(self.buf.as_non_null(), self.cap) {
+                let e = self.alloc.dealloc_array(self.buf.as_non_null(), self.cap);
+                if let Err(e) = e {
                     self.alloc.oom(e);
                 }
             }
