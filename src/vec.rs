@@ -50,6 +50,10 @@ impl<T> Vec<T> {
         self.buf.cap
     }
 
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
     /// Appends an element to the last position.
     ///
     /// # Example
@@ -201,10 +205,12 @@ impl<T> Vec<T> {
         }
     }
 
-    pub fn drain(&mut self) -> Drain<T> {
+    pub fn drain(&mut self, start: usize) -> Drain<T> {
+        assert!(start < self.len);
+
         unsafe {
-            let iter = RawValIter::new(&self);
-            self.len = 0;
+            let iter = RawValIter::new(&self[start..]);
+            self.len = start;
             Drain::new(iter)
         }
     }
@@ -224,7 +230,6 @@ mod tests {
         assert!(v.is_empty());
 
         v.push(0);
-        assert_eq!(v.len(), 1);
         assert_eq!(v.first(), Some(&0));
     }
 
