@@ -260,4 +260,34 @@ mod tests {
 
         assert!(v.pop().is_none());
     }
+
+    #[test]
+    #[should_panic]
+    fn insert_panic_0() {
+        let mut v: Vec<i32> = Vec::default();
+        v.insert(1, 0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn insert_panic_1() {
+        let mut v: Vec<i32> = Vec::default();
+        v.push(0);
+        v.insert(2, 0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_panic_0() {
+        let mut v: Vec<i32> = Vec::default();
+        v.remove(0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_panic_1() {
+        let mut v: Vec<i32> = Vec::default();
+        v.push(0);
+        v.remove(1);
+    }
 }

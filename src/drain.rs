@@ -45,62 +45,72 @@ mod tests {
     use vec::Vec;
 
     #[test]
-    fn next() {
+    fn start_0() {
         let mut v = Vec::default();
         v.push(0);
         v.push(1);
 
-        let mut drain = v.drain();
-        assert_eq!(drain.next(), Some(0));
-        assert_eq!(drain.next(), Some(1));
-        assert_eq!(drain.next(), None);
+        {
+            let mut drain = v.drain(0);
+            assert_eq!(drain.next(), Some(0));
+            assert_eq!(drain.next(), Some(1));
+            assert_eq!(drain.next(), None);
+        }
+
+        assert_eq!(v.len(), 0);
     }
 
     #[test]
-    fn size_hint() {
-        {
-            let v: Vec<i32> = Vec::default();
-            assert_eq!(v.into_iter().size_hint(), (0, Some(0)));
-        }
-
-        {
-            let mut v: Vec<i32> = Vec::default();
-            v.push(0);
-            assert_eq!(v.drain().size_hint(), (1, Some(1)));
-        }
-
-        {
-            let mut v: Vec<i32> = Vec::default();
-            v.push(0);
-            v.push(1);
-            assert_eq!(v.drain().size_hint(), (2, Some(2)));
-        }
-    }
-
-    #[test]
-    fn next_back() {
+    fn start_0_back() {
         let mut v = Vec::default();
         v.push(0);
         v.push(1);
 
-        let mut drain = v.drain();
-        assert_eq!(drain.next_back(), Some(1));
-        assert_eq!(drain.next_back(), Some(0));
-        assert_eq!(drain.next_back(), None);
+        {
+            let mut drain = v.drain(0);
+            assert_eq!(drain.next_back(), Some(1));
+            assert_eq!(drain.next_back(), Some(0));
+            assert_eq!(drain.next_back(), None);
+        }
+
+        assert_eq!(v.len(), 0);
     }
 
     #[test]
-    fn next_next_back() {
+    fn start_1() {
         let mut v = Vec::default();
         v.push(0);
         v.push(1);
-        v.push(2);
 
-        let mut drain = v.drain();
-        assert_eq!(drain.next(), Some(0));
-        assert_eq!(drain.next_back(), Some(2));
-        assert_eq!(drain.next(), Some(1));
-        assert_eq!(drain.next_back(), None);
-        assert_eq!(drain.next(), None);
+        {
+            let mut drain = v.drain(1);
+            assert_eq!(drain.next(), Some(1));
+            assert_eq!(drain.next(), None);
+        }
+
+        assert_eq!(v.len(), 1);
+
+        let mut iter = v.into_iter();
+        assert_eq!(iter.next(), Some(0));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn start_1_back() {
+        let mut v = Vec::default();
+        v.push(0);
+        v.push(1);
+
+        {
+            let mut drain = v.drain(1);
+            assert_eq!(drain.next_back(), Some(1));
+            assert_eq!(drain.next_back(), None);
+        }
+
+        assert_eq!(v.len(), 1);
+
+        let mut iter = v.into_iter();
+        assert_eq!(iter.next_back(), Some(0));
+        assert_eq!(iter.next_back(), None);
     }
 }
