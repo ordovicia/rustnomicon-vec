@@ -54,6 +54,10 @@ impl<T> Vec<T> {
         self.len
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     /// Appends an element to the last position.
     ///
     /// # Example

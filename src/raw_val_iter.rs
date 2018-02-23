@@ -16,7 +16,7 @@ impl<T> RawValIter<T> {
 
         RawValIter {
             start,
-            end: if slice.len() == 0 {
+            end: if slice.is_empty() {
                 start
             } else {
                 start.offset(slice.len() as isize)
