@@ -1,4 +1,5 @@
 #![feature(allocator_api)]
+#![feature(crate_in_paths)]
 // clippy
 #![allow(unknown_lints)]
 #![allow(should_implement_trait)]

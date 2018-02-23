@@ -42,7 +42,7 @@ impl<'a, T> Drain<'a, T> {
 
 #[cfg(test)]
 mod tests {
-    use vec::Vec;
+    use crate::vec::Vec;
 
     #[test]
     fn start_0() {

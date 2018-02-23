@@ -44,7 +44,7 @@ impl<T> IntoIter<T> {
 
 #[cfg(test)]
 mod tests {
-    use vec::Vec;
+    use crate::vec::Vec;
 
     #[test]
     fn next() {
