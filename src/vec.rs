@@ -5,6 +5,7 @@ use std::ptr;
 use raw_vec::RawVec;
 use raw_val_iter::RawValIter;
 use into_iter::IntoIter;
+use drain::Drain;
 
 pub struct Vec<T> {
     buf: RawVec<T>,
@@ -197,6 +198,14 @@ impl<T> Vec<T> {
             mem::forget(self);
 
             IntoIter::new(buf, iter)
+        }
+    }
+
+    pub fn drain(&mut self) -> Drain<T> {
+        unsafe {
+            let iter = RawValIter::new(&self);
+            self.len = 0;
+            Drain::new(iter)
         }
     }
 

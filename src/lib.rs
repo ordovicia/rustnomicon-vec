@@ -5,6 +5,7 @@
 
 pub mod vec;
 pub mod into_iter;
+pub mod drain;
 
 mod owned_ptr;
 mod raw_vec;

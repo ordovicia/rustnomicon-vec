@@ -14,6 +14,7 @@ impl<T> Iterator for IntoIter<T> {
     fn next(&mut self) -> Option<T> {
         self.iter.next()
     }
+
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.iter.size_hint()
     }
