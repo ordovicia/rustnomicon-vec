@@ -1,45 +1,27 @@
 use std::mem;
-use std::ptr;
 
 use raw_vec::RawVec;
+use raw_val_iter::RawValIter;
 
 pub struct IntoIter<T> {
     _buf: RawVec<T>, // we don't actually care abount this. Just need it to live.
-    start: *const T,
-    end: *const T,
+    iter: RawValIter<T>,
 }
 
 impl<T> Iterator for IntoIter<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<T> {
-        if self.start == self.end {
-            None
-        } else {
-            unsafe {
-                let result = ptr::read(self.start);
-                self.start = self.start.offset(1);
-                Some(result)
-            }
-        }
+        self.iter.next()
     }
-
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = (self.end as usize - self.start as usize) / mem::size_of::<T>();
-        (len, Some(len))
+        self.iter.size_hint()
     }
 }
 
 impl<T> DoubleEndedIterator for IntoIter<T> {
     fn next_back(&mut self) -> Option<T> {
-        if self.start == self.end {
-            None
-        } else {
-            unsafe {
-                self.end = self.end.offset(-1);
-                Some(ptr::read(self.end))
-            }
-        }
+        self.iter.next_back()
     }
 }
 
@@ -54,12 +36,8 @@ impl<T> Drop for IntoIter<T> {
 }
 
 impl<T> IntoIter<T> {
-    pub(super) fn new(buf: RawVec<T>, start: *const T, end: *const T) -> Self {
-        IntoIter {
-            _buf: buf,
-            start,
-            end,
-        }
+    pub(super) fn new(buf: RawVec<T>, iter: RawValIter<T>) -> Self {
+        IntoIter { _buf: buf, iter }
     }
 }
 

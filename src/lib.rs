@@ -8,6 +8,7 @@ pub mod into_iter;
 
 mod owned_ptr;
 mod raw_vec;
+mod raw_val_iter;
 
 #[cfg(test)]
 mod tests {}

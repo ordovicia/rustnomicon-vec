@@ -3,6 +3,7 @@ use std::ops::{Deref, DerefMut};
 use std::ptr;
 
 use raw_vec::RawVec;
+use raw_val_iter::RawValIter;
 use into_iter::IntoIter;
 
 pub struct Vec<T> {
@@ -48,7 +49,7 @@ impl<T> Vec<T> {
         self.buf.cap
     }
 
-    /// Stores an element to the last position.
+    /// Appends an element to the last position.
     ///
     /// # Example
     ///
@@ -189,26 +190,14 @@ impl<T> Vec<T> {
     ///
     /// [`IntoIter`]: ../into_iter/struct.IntoIter.html
     pub fn into_iter(self) -> IntoIter<T> {
-        // need to use ptr::read to unsafely move the buf out since it's
-        // not Copy, and Vec implements Drop (so we can't destructure it).
-        let buf = unsafe { ptr::read(&self.buf) };
-        let cap = self.capacity();
-        let len = self.len;
+        unsafe {
+            let iter = RawValIter::new(&self);
 
-        mem::forget(self);
+            let buf = ptr::read(&self.buf);
+            mem::forget(self);
 
-        let start = buf.ptr.as_ptr();
-
-        IntoIter::new(
-            buf,
-            start,
-            if cap == 0 {
-                // can't offset off this pointer, it's not allocated!
-                start
-            } else {
-                unsafe { start.offset(len as isize) }
-            },
-        )
+            IntoIter::new(buf, iter)
+        }
     }
 
     fn ptr(&self) -> *mut T {
