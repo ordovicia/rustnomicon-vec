@@ -97,12 +97,14 @@ mod tests {
         v.push(0);
         v.push(1);
         v.push(2);
+        v.push(3);
 
         let mut iter = v.into_iter();
         assert_eq!(iter.next(), Some(0));
-        assert_eq!(iter.next_back(), Some(2));
+        assert_eq!(iter.next_back(), Some(3));
         assert_eq!(iter.next(), Some(1));
-        assert_eq!(iter.next_back(), None);
+        assert_eq!(iter.next_back(), Some(2));
         assert_eq!(iter.next(), None);
+        assert_eq!(iter.next_back(), None);
     }
 }

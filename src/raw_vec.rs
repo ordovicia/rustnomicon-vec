@@ -11,7 +11,10 @@ pub(super) struct RawVec<T> {
 
 impl<T> Drop for RawVec<T> {
     fn drop(&mut self) {
-        if self.cap == 0 {
+        let elem_size = mem::size_of::<T>();
+
+        // don't free zero-sized allocations, as they were never allocated.
+        if self.cap == 0 || elem_size == 0 {
             return;
         }
 
@@ -30,19 +33,26 @@ impl<T> Drop for RawVec<T> {
 
 impl<T> RawVec<T> {
     pub(super) fn default() -> Self {
-        assert!(mem::size_of::<T>() != 0, "We're not ready to handle ZSTs");
+        // !0 is usize::MAX. This branch should be stripped at compile time.
+        let cap = if mem::size_of::<T>() == 0 { !0 } else { 0 };
+
         RawVec {
             ptr: OwnedPtr::empty(),
-            cap: 0,
+            cap: cap,
             alloc: Heap,
         }
     }
 
     pub(super) fn grow(&mut self) {
+        let elem_size = mem::size_of::<T>();
+
+        // since we set the capacity to usize::MAX when elem_size is
+        // 0, getting to here necessarily means the Vec is overfull.
+        assert!(elem_size != 0, "capacity overflow");
+
         let (ptr, new_cap) = if self.cap == 0 {
             (self.alloc.alloc_one::<T>(), 1)
         } else {
-            let elem_size = mem::size_of::<T>();
             let old_num_bytes = self.cap * elem_size;
 
             assert!(
@@ -72,12 +82,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[should_panic]
-    fn zst_panic() {
-        let _: RawVec<()> = RawVec::default();
-    }
-
-    #[test]
     fn grow() {
         let mut v: RawVec<i32> = RawVec::default();
         assert_eq!(v.cap, 0);
@@ -86,5 +90,10 @@ mod tests {
             v.grow();
             assert_eq!(v.cap, cap);
         }
+    }
+
+    #[test]
+    fn drop_zst() {
+        let _: RawVec<()> = RawVec::default();
     }
 }
