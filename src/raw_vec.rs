@@ -38,7 +38,7 @@ impl<T> RawVec<T> {
 
         RawVec {
             ptr: OwnedPtr::empty(),
-            cap: cap,
+            cap,
             alloc: Heap,
         }
     }
